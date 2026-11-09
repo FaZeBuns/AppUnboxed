@@ -18,6 +18,7 @@ public struct ContentView: View {
     @State private var reelPosition: CGFloat = 3      // which card sits under the marker
     @State private var landed: Bool = false
     @State private var showAddApps: Bool = false
+    @State private var showCustomList: Bool = false
     @State private var pendingUnbox: Bool = false
     @State private var isGoldSequence: Bool = false
     @State private var isGoldSecondSpin: Bool = false
@@ -93,6 +94,11 @@ public struct ContentView: View {
             }
         }
         .edgesIgnoringSafeArea(.all)
+        .sheet(isPresented: $showCustomList, onDismiss: {
+            generateReel()
+        }) {
+            CustomAppsListView(model: appsModel)
+        }
     }
 
     // MARK: - Top Hardware Bar
@@ -263,7 +269,7 @@ public struct ContentView: View {
             HStack(spacing: 8) {
                 pillFor(.media)
                 pillFor(.food)
-                pillFor(.tools)
+                pillFor(.custom)
             }
         }
     }
@@ -275,11 +281,20 @@ public struct ContentView: View {
             count: appsModel.count(for: cat),
             scanDone: appsModel.scanDone,
             onSelect: {
-                guard appsModel.selectedCategory != cat else { return }
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
-                    appsModel.selectedCategory = cat
-                    generateReel()
+                if cat == .custom {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                        appsModel.selectedCategory = .custom
+                        generateReel()
+                    }
+                    showCustomList = true
+                } else {
+                    guard appsModel.selectedCategory != cat else { return }
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                        appsModel.selectedCategory = cat
+                        generateReel()
+                    }
                 }
             }
         )
@@ -321,13 +336,16 @@ public struct ContentView: View {
                         .foregroundColor(.white.opacity(0.3))
 
                     Button(action: {
-                        let all = AppCategory.allCases
-                        if let idx = all.firstIndex(of: appsModel.selectedCategory) {
-                            let next = all[(idx + 1) % all.count]
+                        let cases = AppCategory.primaryCases
+                        if let idx = cases.firstIndex(of: appsModel.selectedCategory) {
+                            let next = cases[(idx + 1) % cases.count]
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
                                 appsModel.selectedCategory = next
                                 generateReel()
+                            }
+                            if next == .custom {
+                                showCustomList = true
                             }
                         }
                     }) {
@@ -639,8 +657,10 @@ public struct ContentView: View {
         if isGoldHit {
             isGoldSequence = true
             // Select the actual winning gold app for the 2nd spin:
-            let allGoldCandidates = appsModel.apps.filter { $0.rarity == "gold" }
-            let goldPool = allGoldCandidates.isEmpty ? appsModel.apps : allGoldCandidates
+            let catApps = appsModel.apps(in: appsModel.selectedCategory)
+            let catGold = catApps.filter { $0.rarity == "gold" }
+            let allGoldCandidates = catGold.isEmpty ? appsModel.apps.filter { $0.rarity == "gold" } : catGold
+            let goldPool = allGoldCandidates.isEmpty ? (catApps.isEmpty ? appsModel.apps : catApps) : allGoldCandidates
             let chosenWinner = (goldPool.randomElement() ?? items[winnerTargetIndex]).asRevealed()
             finalGoldWinner = chosenWinner
 
@@ -718,8 +738,10 @@ public struct ContentView: View {
         statusText = "★ GOLD VAULT UNLOCKED // SPINNING FOR GOLD... ★"
 
         // Build All-Gold Reel
-        let allGold = appsModel.apps.filter { $0.rarity == "gold" }.map { $0.asRevealed() }
-        let basePool = allGold.isEmpty ? appsModel.apps.map { $0.asRevealed() } : allGold
+        let catApps = appsModel.apps(in: appsModel.selectedCategory)
+        let catGold = catApps.filter { $0.rarity == "gold" }.map { $0.asRevealed() }
+        let allGold = catGold.isEmpty ? appsModel.apps.filter { $0.rarity == "gold" }.map { $0.asRevealed() } : catGold
+        let basePool = allGold.isEmpty ? (catApps.isEmpty ? appsModel.apps.map { $0.asRevealed() } : catApps.map { $0.asRevealed() }) : allGold
 
         var goldReelItems: [AppEntry] = []
         for _ in 0..<totalReelCards {

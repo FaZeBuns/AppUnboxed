@@ -267,12 +267,61 @@ public class InstalledAppsModel: ObservableObject {
 
     public func apps(in category: AppCategory) -> [AppEntry] {
         if category == .all { return apps }
+        if category == .custom {
+            let selected = apps.filter { customSelectedIDs.contains($0.id) }
+            return selected.isEmpty ? apps : selected
+        }
         return apps.filter { $0.category == category }
     }
 
     public func count(for category: AppCategory) -> Int {
         if category == .all { return apps.count }
+        if category == .custom {
+            let allIDs = Set(apps.map { $0.id })
+            return customSelectedIDs.intersection(allIDs).count
+        }
         return apps.filter { $0.category == category }.count
+    }
+
+    // MARK: - Custom Case Selection
+    @Published public var customSelectedIDs: Set<String> = []
+    private static let customKey = "appunboxed.customSelectedIDs.v1"
+
+    public func isCustomSelected(id: String) -> Bool {
+        customSelectedIDs.contains(id)
+    }
+
+    public func toggleCustomSelected(id: String) {
+        if customSelectedIDs.contains(id) {
+            customSelectedIDs.remove(id)
+        } else {
+            customSelectedIDs.insert(id)
+        }
+        saveCustomSelection()
+    }
+
+    public func selectAllCustom() {
+        customSelectedIDs = Set(apps.map { $0.id })
+        saveCustomSelection()
+    }
+
+    public func deselectAllCustom() {
+        customSelectedIDs.removeAll()
+        saveCustomSelection()
+    }
+
+    public func toggleAllOrNoneCustom() {
+        let allIDs = Set(apps.map { $0.id })
+        if !allIDs.isEmpty && allIDs.isSubset(of: customSelectedIDs) {
+            customSelectedIDs.removeAll()
+        } else {
+            customSelectedIDs = allIDs
+        }
+        saveCustomSelection()
+    }
+
+    private func saveCustomSelection() {
+        UserDefaults.standard.set(Array(customSelectedIDs), forKey: Self.customKey)
     }
 
     fileprivate static let rarityNames = ["g": "gold", "c": "covert", "k": "classified", "r": "restricted", "m": "milspec"]
@@ -300,6 +349,11 @@ public class InstalledAppsModel: ObservableObject {
             .filter { AppCatalog.starterIDs.contains($0.bundleID) }
             .map { Self.entry(from: $0, icon: nil) }
         manualIDs = Set(Self.loadManual().map { $0[0] })
+        if let saved = UserDefaults.standard.array(forKey: Self.customKey) as? [String] {
+            customSelectedIDs = Set(saved)
+        } else {
+            customSelectedIDs = AppCatalog.starterIDs
+        }
         scan()
         // Rescan every time the app comes back to the front, so apps installed
         // or deleted since the last spin are picked up.
@@ -481,6 +535,9 @@ public class InstalledAppsModel: ObservableObject {
                 self.isScanning = false
                 self.scanFraction = 1
                 self.scanDone = true
+                if UserDefaults.standard.array(forKey: Self.customKey) == nil {
+                    self.customSelectedIDs = Set(self.apps.map { $0.id })
+                }
                 UserDefaults.standard.set(self.sourceStatus, forKey: "appunboxed.debug.status")
                 if self.rescanWanted { self.rescanWanted = false; self.scan() }
             }

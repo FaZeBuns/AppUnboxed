@@ -7,9 +7,13 @@ public enum AppCategory: String, CaseIterable, Identifiable, Codable {
     case social = "social"
     case media = "media"
     case food = "food"
+    case custom = "custom"
     case tools = "tools"
 
     public var id: String { rawValue }
+
+    /// The 6 user-facing case categories on the iPhone Duo cover screen.
+    public static let primaryCases: [AppCategory] = [.all, .games, .social, .media, .food, .custom]
 
     public var title: String {
         switch self {
@@ -18,6 +22,7 @@ public enum AppCategory: String, CaseIterable, Identifiable, Codable {
         case .social: return "SOCIAL"
         case .media: return "MEDIA"
         case .food: return "FOOD"
+        case .custom: return "CUSTOM"
         case .tools: return "TOOLS"
         }
     }
@@ -29,6 +34,7 @@ public enum AppCategory: String, CaseIterable, Identifiable, Codable {
         case .social: return "SOCIAL CASE · CHAT & CONNECT"
         case .media: return "MEDIA CASE · STREAM & WATCH"
         case .food: return "FOOD CASE · WHAT'S FOR DINNER?"
+        case .custom: return "CUSTOM CASE · YOUR CHOSEN APPS"
         case .tools: return "TOOLS CASE · GET THINGS DONE"
         }
     }
@@ -40,6 +46,7 @@ public enum AppCategory: String, CaseIterable, Identifiable, Codable {
         case .social: return "bubble.left.and.bubble.right.fill"
         case .media: return "play.tv.fill"
         case .food: return "fork.knife"
+        case .custom: return "slider.horizontal.3"
         case .tools: return "wrench.and.screwdriver.fill"
         }
     }
@@ -51,6 +58,7 @@ public enum AppCategory: String, CaseIterable, Identifiable, Codable {
         case .social: return "💬"
         case .media: return "🎬"
         case .food: return "🍔"
+        case .custom: return "✨"
         case .tools: return "⚙️"
         }
     }

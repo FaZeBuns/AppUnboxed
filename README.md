@@ -21,7 +21,11 @@ iPhone (iOS 16 or newer).
 - **Cover screen**: an idle 3D loot box that spins, floats, rattles and leaks
   gold light while your apps are dynamically scanned.
 - **Category Filter**: 6 quick toggles on the cover screen (`ALL`, `GAMES`,
-  `SOCIAL`, `MEDIA`, `FOOD`, `TOOLS`) to roll from all apps or specific cases.
+  `SOCIAL`, `MEDIA`, `FOOD`, `CUSTOM`) to roll from all apps or specific cases.
+- **Custom Case Picker**: tap `CUSTOM` to pull up your complete app checklist.
+  Toggle any specific apps or games you want in your custom spin, with instant
+  search, category filters, a top-left **DONE** button, and a top-right **ALL / NONE**
+  toggle. Your selection persists across launches.
 - **Unfold to open**: tells an unfold apart from a rotation.
 - **Crate cinematic**: a real six-sided crate with synced sound and haptics.
 - **Fullscreen reel**: one tick per card, weighted drop odds (2% gold up to
