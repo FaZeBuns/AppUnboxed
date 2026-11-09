@@ -2,8 +2,13 @@
 dist/
 build/
 build.env
+.env
+*.log
+*.tmp
 __pycache__/
 .DS_Store
+.vscode/
+.idea/
 test_results/
 detection_report.json
 device_dump.json
