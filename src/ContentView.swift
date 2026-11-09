@@ -168,7 +168,8 @@ public struct ContentView: View {
                            startPoint: .top, endPoint: .bottom)
 
             VStack(spacing: 0) {
-                VStack(spacing: 10) {
+                // Header Title + Subtitle for Active Category
+                VStack(spacing: 8) {
                     Text("APP UNBOXED")
                         .font(.system(size: min(width * 0.088, 36), weight: .heavy, design: .rounded))
                         .kerning(min(width * 0.02, 8))
@@ -176,32 +177,42 @@ public struct ContentView: View {
                         .shadow(color: Color(red: 1, green: 0.75, blue: 0.1).opacity(0.55), radius: 16)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
-                    Text("EVERY APP · ONE CASE")
+
+                    Text(appsModel.selectedCategory.subtitle)
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .kerning(3)
-                        .foregroundColor(.white.opacity(0.4))
+                        .kerning(2)
+                        .foregroundColor(.white.opacity(0.55))
+                        .animation(.easeInOut(duration: 0.2), value: appsModel.selectedCategory)
                 }
-                .padding(.top, max(36, height * 0.09))
+                .padding(.top, max(28, height * 0.065))
                 .padding(.horizontal, 20)
 
-                // The loot box. Tapping it opens a case without unfolding.
+                // The 3D rotating loot box. Tapping it opens a case without unfolding.
                 CoverCrate()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
                     .onTapGesture { hinge.setFoldedState(false) }
 
-                VStack(spacing: 12) {
+                // 6 Category Toggles (ALL + 5 Big Categories)
+                categorySelectorView(width: width)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+
+                // Bottom prompt / scan status
+                VStack(spacing: 8) {
                     if appsModel.scanDone {
                         Text("OPEN YOUR IPHONE DUO")
-                            .font(.system(size: 14, weight: .heavy, design: .rounded))
+                            .font(.system(size: 13, weight: .heavy, design: .rounded))
                             .kerning(3)
                             .foregroundColor(.white)
                             .opacity(pulseGlow ? 1 : 0.4)
                             .animation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true), value: pulseGlow)
-                        Text("\(appsModel.apps.count) APPS LOADED · OR TAP THE BOX")
+
+                        let currentCount = appsModel.count(for: appsModel.selectedCategory)
+                        Text("\(currentCount) \(appsModel.selectedCategory.title) APPS · OR TAP THE BOX")
                             .font(.system(size: 9, weight: .bold, design: .monospaced))
                             .kerning(1.5)
-                            .foregroundColor(.white.opacity(0.35))
+                            .foregroundColor(.white.opacity(0.45))
                     } else {
                         Text("SCANNING YOUR APPS")
                             .font(.system(size: 12, weight: .heavy, design: .rounded))
@@ -220,12 +231,45 @@ public struct ContentView: View {
                             .foregroundColor(.white.opacity(0.35))
                     }
                 }
-                .frame(height: 64)
-                .padding(.bottom, max(30, height * 0.07))
+                .frame(height: 52)
+                .padding(.bottom, max(20, height * 0.045))
                 .onAppear { pulseGlow = true }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Category Selector View (6 Toggles)
+    private func categorySelectorView(width: CGFloat) -> some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                pillFor(.all)
+                pillFor(.games)
+                pillFor(.social)
+            }
+            HStack(spacing: 8) {
+                pillFor(.media)
+                pillFor(.food)
+                pillFor(.tools)
+            }
+        }
+    }
+
+    private func pillFor(_ cat: AppCategory) -> some View {
+        CategoryPillButton(
+            category: cat,
+            isSelected: appsModel.selectedCategory == cat,
+            count: appsModel.count(for: cat),
+            scanDone: appsModel.scanDone,
+            onSelect: {
+                guard appsModel.selectedCategory != cat else { return }
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                    appsModel.selectedCategory = cat
+                    generateReel()
+                }
+            }
+        )
     }
 
     // MARK: - 2. Fullscreen Case Roll
@@ -254,11 +298,48 @@ public struct ContentView: View {
 
             // Header / footer
             VStack(spacing: 0) {
-                Text("APP UNBOXED")
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
-                    .kerning(6)
-                    .foregroundColor(.white.opacity(0.55))
-                    .padding(.top, max(26, height * 0.06))
+                HStack(spacing: 8) {
+                    Text("APP UNBOXED")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .kerning(5)
+                        .foregroundColor(.white.opacity(0.55))
+
+                    Text("·")
+                        .foregroundColor(.white.opacity(0.3))
+
+                    Button(action: {
+                        let all = AppCategory.allCases
+                        if let idx = all.firstIndex(of: appsModel.selectedCategory) {
+                            let next = all[(idx + 1) % all.count]
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                                appsModel.selectedCategory = next
+                                generateReel()
+                            }
+                        }
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: appsModel.selectedCategory.iconSymbol)
+                                .font(.system(size: 10, weight: .bold))
+                            Text(appsModel.selectedCategory.title + " CASE")
+                                .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 8, weight: .bold))
+                                .opacity(0.6)
+                        }
+                        .foregroundColor(.yellow)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(Color.yellow.opacity(0.14))
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+                .padding(.top, max(26, height * 0.06))
 
                 Spacer()
 
@@ -572,5 +653,72 @@ public struct ContentView: View {
             edge += 1
         }
         return times
+    }
+}
+
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+struct CategoryPillButton: View {
+    let category: AppCategory
+    let isSelected: Bool
+    let count: Int
+    let scanDone: Bool
+    let onSelect: () -> Void
+
+    private static let goldGradient = LinearGradient(
+        colors: [Color(red: 1.0, green: 0.88, blue: 0.35), Color(red: 0.95, green: 0.68, blue: 0.05)],
+        startPoint: .top,
+        endPoint: .bottom
+    )
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 5) {
+                Image(systemName: category.iconSymbol)
+                    .font(.system(size: 11, weight: .bold))
+
+                Text(category.title)
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .kerning(0.5)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                if scanDone && count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(isSelected ? Color.black.opacity(0.2) : Color.white.opacity(0.12))
+                        .clipShape(Capsule())
+                        .lineLimit(1)
+                }
+            }
+            .foregroundColor(isSelected ? .black : .white.opacity(0.85))
+            .frame(maxWidth: .infinity)
+            .frame(height: 38)
+            .background(backgroundView)
+            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .stroke(isSelected ? Color.yellow : Color.white.opacity(0.14), lineWidth: isSelected ? 1.5 : 1)
+            )
+            .shadow(color: isSelected ? Color.yellow.opacity(0.45) : .clear, radius: 8, x: 0, y: 0)
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    @ViewBuilder
+    private var backgroundView: some View {
+        if isSelected {
+            Self.goldGradient
+        } else {
+            Color(red: 0.10, green: 0.11, blue: 0.14).opacity(0.92)
+        }
     }
 }

@@ -8,6 +8,17 @@ public struct AppEntry: Identifiable, Hashable {
     public let rarity: String      // "milspec", "restricted", "classified", "covert", "gold"
     public let systemIcon: String  // SF Symbol fallback
     public let icon: UIImage?      // the app's real icon when iOS hands it over
+    public let category: AppCategory
+
+    public init(id: String, name: String, scheme: String, rarity: String, systemIcon: String, icon: UIImage?, category: AppCategory = .tools) {
+        self.id = id
+        self.name = name
+        self.scheme = scheme
+        self.rarity = rarity
+        self.systemIcon = systemIcon
+        self.icon = icon
+        self.category = category
+    }
 
     public var color: UIColor {
         switch rarity {
@@ -237,6 +248,7 @@ enum RemoteIcons {
 
 public class InstalledAppsModel: ObservableObject {
     @Published public var apps: [AppEntry] = []
+    @Published public var selectedCategory: AppCategory = .all
     /// One line describing how the list was built, shown on the roll screen.
     @Published public var sourceStatus: String = "SCANNING APPS..."
     /// Bundle ids the user added by hand (always in the reel).
@@ -245,6 +257,16 @@ public class InstalledAppsModel: ObservableObject {
     /// case is held back until then so the reel has every app in it.
     @Published public var scanDone: Bool = false
     @Published public var scanFraction: Double = 0
+
+    public func apps(in category: AppCategory) -> [AppEntry] {
+        if category == .all { return apps }
+        return apps.filter { $0.category == category }
+    }
+
+    public func count(for category: AppCategory) -> Int {
+        if category == .all { return apps.count }
+        return apps.filter { $0.category == category }.count
+    }
 
     fileprivate static let rarityNames = ["g": "gold", "c": "covert", "k": "classified", "r": "restricted", "m": "milspec"]
     private static let tierWeights: [(String, Int)] = [
@@ -282,7 +304,72 @@ public class InstalledAppsModel: ObservableObject {
 
     fileprivate static func entry(from c: CatalogApp, icon: UIImage?) -> AppEntry {
         AppEntry(id: c.bundleID, name: c.name, scheme: c.scheme,
-                 rarity: rarityNames[c.rarity] ?? "milspec", systemIcon: c.symbol, icon: icon)
+                 rarity: rarityNames[c.rarity] ?? "milspec", systemIcon: c.symbol, icon: icon,
+                 category: c.category)
+    }
+
+    /// Automatic classifier for dynamically discovered apps and games worldwide.
+    public static func categorize(bundleID: String, name: String) -> AppCategory {
+        let b = bundleID.lowercased()
+        let n = name.lowercased()
+
+        // 1. Food & Dining
+        let foodTerms = [
+            "food", "eat", "eats", "dining", "restaurant", "burger", "pizza", "coffee", "cafe",
+            "taco", "delivery", "order", "kitchen", "grill", "bakery", "mcdonald", "starbucks",
+            "subway", "domino", "pizzahut", "kfc", "chipotle", "dunkin", "tacobell", "wendy",
+            "doordash", "ubereats", "grubhub", "postmates", "instacart", "gopuff", "dairyqueen",
+            "dairy queen", "firehouse", "jerseymike", "jersey mike", "papajohn", "papa john",
+            "zaxby", "jimmyjohn", "jimmy john", "jackinthebox", "jack in the box", "panera",
+            "sonic", "chickfila", "chick-fil-a", "crumbl", "sweetgreen", "cava", "panda express",
+            "wingstop", "whataburger", "culver", "dave's hot chicken", "raising cane", "boba"
+        ]
+        if foodTerms.contains(where: { b.contains($0) || n.contains($0) }) {
+            return .food
+        }
+
+        // 2. Games
+        let gameTerms = [
+            "game", "games", "play", "craft", "clash", "quest", "runner", "race", "racing",
+            "strike", "puzzle", "rpg", "arcade", "simulator", "idle", "tycoon", "defense",
+            "survivor", "survivors", "kart", "royale", "battle", "chess", "poker", "casino",
+            "slots", "crossword", "sudoku", "solitaire", "brawl", "roblox", "minecraft",
+            "fortnite", "pokemon", "pokemongo", "supercell", "epicgames", "valve", "miniclip",
+            "playrix", "king.", "rovio", "niantic", "activision", "gameloft", "mojang",
+            "riotgames", "steam", "nintendo", "sega", "capcom", "ubisoft", "subway surfers",
+            "temple run", "candy crush", "balatro", "hearthstone", "wild rift", "monopoly"
+        ]
+        if gameTerms.contains(where: { b.contains($0) || n.contains($0) }) {
+            return .games
+        }
+
+        // 3. Social Media & Chat
+        let socialTerms = [
+            "social", "chat", "message", "messenger", "talk", "tweet", "twitter", "instagram",
+            "tiktok", "snapchat", "discord", "reddit", "facebook", "whatsapp", "telegram",
+            "signal", "threads", "bluesky", "mastodon", "pinterest", "tumblr", "bereal",
+            "wechat", "line", "viber", "clubhouse", "meetup", "tinder", "bumble", "hinge",
+            "secondline", "talkatone", "truecaller", "groupme", "skype", "contacts"
+        ]
+        if socialTerms.contains(where: { b.contains($0) || n.contains($0) }) {
+            return .social
+        }
+
+        // 4. Media & Streaming
+        let mediaTerms = [
+            "media", "music", "video", "stream", "tv", "movie", "movies", "audio", "sound",
+            "radio", "podcast", "podcasts", "youtube", "spotify", "netflix", "hulu", "disney",
+            "prime video", "max", "hbo", "crunchyroll", "twitch", "kick", "soundcloud",
+            "pandora", "iheart", "audible", "shazam", "plex", "vlc", "capcut", "photoleap",
+            "artleap", "motionleap", "camera", "photos", "slideshow", "cinema", "paramount",
+            "peacock", "tidal", "deezer", "bandcamp", "zedge"
+        ]
+        if mediaTerms.contains(where: { b.contains($0) || n.contains($0) }) {
+            return .media
+        }
+
+        // 5. Default to Tools
+        return .tools
     }
 
     /// Stable pseudo-random rarity for apps without a hand-picked one.
@@ -398,7 +485,7 @@ public class InstalledAppsModel: ObservableObject {
     }
 
     private static func saveCache(_ apps: [AppEntry]) {
-        let rows = apps.map { [$0.id, $0.name, $0.scheme, $0.rarity, $0.systemIcon] }
+        let rows = apps.map { [$0.id, $0.name, $0.scheme, $0.rarity, $0.systemIcon, $0.category.rawValue] }
         UserDefaults.standard.set(rows, forKey: cacheKey)
     }
 
@@ -484,19 +571,26 @@ public class InstalledAppsModel: ObservableObject {
             for row in rows where row.count == 3 {
                 manual[row[0]] = row[2]
                 let icon = deviceIcon(row[0]) ?? RemoteIcons.cached(row[0])
+                let cat = InstalledAppsModel.categorize(bundleID: row[0], name: row[1])
                 if add(AppEntry(id: row[0], name: row[1], scheme: "",
                                 rarity: InstalledAppsModel.rarity(forUnknown: row[0]),
-                                systemIcon: "app.fill", icon: icon), dedupeName: false) { byHand += 1 }
+                                systemIcon: "app.fill", icon: icon, category: cat), dedupeName: false) { byHand += 1 }
             }
         }
 
         func passCached(_ rows: [[String]]) {
-            for row in rows where row.count == 5 {
+            for row in rows where row.count >= 5 {
                 let id = row[0]
                 let icon = deviceIcon(id)
                 guard icon != nil || installedCheck?(id) == true || (!row[2].isEmpty && openableSchemes.contains(row[2])) else { continue }
+                let cat: AppCategory
+                if row.count >= 6, let parsed = AppCategory(rawValue: row[5]) {
+                    cat = parsed
+                } else {
+                    cat = InstalledAppsModel.categorize(bundleID: id, name: row[1])
+                }
                 if add(AppEntry(id: id, name: row[1], scheme: row[2], rarity: row[3],
-                                systemIcon: row[4], icon: icon ?? RemoteIcons.cached(id)), dedupeName: true) {
+                                systemIcon: row[4], icon: icon ?? RemoteIcons.cached(id), category: cat), dedupeName: true) {
                     count(icon: icon, id: id)
                 }
             }
@@ -524,9 +618,10 @@ public class InstalledAppsModel: ObservableObject {
             // Everything iOS itself reported (only when it allows the full list).
             for app in lsApps {
                 let icon = deviceIcon(app.id)
+                let cat = InstalledAppsModel.categorize(bundleID: app.id, name: app.name)
                 if add(AppEntry(id: app.id, name: app.name, scheme: "",
                                 rarity: InstalledAppsModel.rarity(forUnknown: app.id),
-                                systemIcon: "app.fill", icon: icon), dedupeName: true) { byIcon += 1 }
+                                systemIcon: "app.fill", icon: icon, category: cat), dedupeName: true) { byIcon += 1 }
             }
         }
 
@@ -543,12 +638,14 @@ public class InstalledAppsModel: ObservableObject {
                 if let cat = catalogMap[id] {
                     let entry = AppEntry(id: id, name: cat.name, scheme: cat.scheme,
                                          rarity: InstalledAppsModel.rarityNames[cat.rarity] ?? "milspec",
-                                         systemIcon: cat.symbol, icon: icon)
+                                         systemIcon: cat.symbol, icon: icon, category: cat.category)
                     if add(entry, dedupeName: true) { byPlugin += 1 }
                 } else {
+                    let cat = InstalledAppsModel.categorize(bundleID: id, name: name)
                     let entry = AppEntry(id: id, name: name, scheme: "",
                                          rarity: InstalledAppsModel.rarity(forUnknown: id),
-                                         systemIcon: "app.fill", icon: icon)
+                                         systemIcon: cat == .games ? "gamecontroller.fill" : "app.fill",
+                                         icon: icon, category: cat)
                     if add(entry, dedupeName: true) { byPlugin += 1 }
                 }
             }
@@ -602,10 +699,11 @@ public class InstalledAppsModel: ObservableObject {
             for i in hitIndexes.sorted() {
                 let c = candidates[i]
                 let icon = deviceIcon(c.id)
+                let cat = c.game ? AppCategory.games : InstalledAppsModel.categorize(bundleID: c.id, name: c.name)
                 if add(AppEntry(id: c.id, name: c.name, scheme: "",
                                 rarity: InstalledAppsModel.rarity(forUnknown: c.id),
                                 systemIcon: c.game ? "gamecontroller.fill" : "app.fill",
-                                icon: icon ?? RemoteIcons.cached(c.id)), dedupeName: false) {
+                                icon: icon ?? RemoteIcons.cached(c.id), category: cat), dedupeName: false) {
                     count(icon: icon, id: c.id)
                 }
             }
@@ -620,7 +718,7 @@ public class InstalledAppsModel: ObservableObject {
             for (i, app) in found.enumerated() where app.icon == nil {
                 if let disk = RemoteIcons.cached(app.id) {
                     found[i] = AppEntry(id: app.id, name: app.name, scheme: app.scheme, rarity: app.rarity,
-                                        systemIcon: app.systemIcon, icon: disk)
+                                        systemIcon: app.systemIcon, icon: disk, category: app.category)
                 }
             }
 
@@ -646,7 +744,7 @@ public class InstalledAppsModel: ObservableObject {
                       let icon = RemoteIcons.downloadImage(from: art, saveID: app.id) else { continue }
 
                 found[i] = AppEntry(id: app.id, name: app.name, scheme: app.scheme, rarity: app.rarity,
-                                    systemIcon: app.systemIcon, icon: icon)
+                                    systemIcon: app.systemIcon, icon: icon, category: app.category)
                 fetched += 1
                 if fetched % 5 == 0 { progress() }
             }
@@ -672,18 +770,22 @@ public class InstalledAppsModel: ObservableObject {
     // MARK: Weighted picks (CS:GO odds)
 
     /// Picks a tier by the drop odds (skipping empty tiers), then an app in it.
-    public func randomWeighted() -> AppEntry? {
-        guard !apps.isEmpty else { return nil }
-        let byTier = Dictionary(grouping: apps, by: { $0.rarity })
+    /// Filters by category when specified or when selectedCategory != .all.
+    public func randomWeighted(in category: AppCategory? = nil) -> AppEntry? {
+        let cat = category ?? selectedCategory
+        let pool = apps(in: cat)
+        let candidates = pool.isEmpty ? apps : pool
+        guard !candidates.isEmpty else { return nil }
+        let byTier = Dictionary(grouping: candidates, by: { $0.rarity })
         let live = Self.tierWeights.filter { !(byTier[$0.0] ?? []).isEmpty }
         let total = live.reduce(0) { $0 + $1.1 }
-        guard total > 0 else { return apps.randomElement() }
+        guard total > 0 else { return candidates.randomElement() }
         var roll = Int.random(in: 0..<total)
         for (tier, weight) in live {
             if roll < weight { return byTier[tier]?.randomElement() }
             roll -= weight
         }
-        return apps.randomElement()
+        return candidates.randomElement()
     }
 
     /// A few app names in a tier, for the odds table.
