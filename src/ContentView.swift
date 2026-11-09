@@ -19,6 +19,11 @@ public struct ContentView: View {
     @State private var landed: Bool = false
     @State private var showAddApps: Bool = false
     @State private var pendingUnbox: Bool = false
+    @State private var isGoldSequence: Bool = false
+    @State private var isGoldSecondSpin: Bool = false
+    @State private var finalGoldWinner: AppEntry? = nil
+    @State private var forceGoldNext: Bool = false
+    @State private var titleTapCount: Int = 0
 
     let totalReelCards = 70
     let winnerTargetIndex = 54
@@ -177,12 +182,20 @@ public struct ContentView: View {
                         .shadow(color: Color(red: 1, green: 0.75, blue: 0.1).opacity(0.55), radius: 16)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
+                        .onTapGesture {
+                            titleTapCount += 1
+                            if titleTapCount >= 3 {
+                                titleTapCount = 0
+                                forceGoldNext.toggle()
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                            }
+                        }
 
-                    Text(appsModel.selectedCategory.subtitle)
+                    Text(forceGoldNext ? "★ GOLD VAULT PRIMED FOR NEXT SPIN ★" : appsModel.selectedCategory.subtitle)
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .kerning(2)
-                        .foregroundColor(.white.opacity(0.55))
-                        .animation(.easeInOut(duration: 0.2), value: appsModel.selectedCategory)
+                        .foregroundColor(forceGoldNext ? .yellow : .white.opacity(0.55))
+                        .animation(.easeInOut(duration: 0.2), value: forceGoldNext)
                 }
                 .padding(.top, max(28, height * 0.065))
                 .padding(.horizontal, 20)
@@ -355,19 +368,34 @@ public struct ContentView: View {
                         .transition(.opacity)
                     } else if landed, let app = winningApp {
                         VStack(spacing: 6) {
-                            Text(app.rarity.uppercased())
-                                .font(.system(size: 11, weight: .heavy, design: .monospaced))
-                                .kerning(3)
-                                .foregroundColor(Color(app.color))
-                            Text(app.name)
-                                .font(.system(size: 34, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.5)
-                            Text("OPENING…")
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .kerning(2)
-                                .foregroundColor(.white.opacity(0.45))
+                            if isGoldSequence && !isGoldSecondSpin {
+                                Text("★ SPECIAL RARE ITEM HIT! ★")
+                                    .font(.system(size: 12, weight: .black, design: .monospaced))
+                                    .kerning(3)
+                                    .foregroundColor(Color.yellow)
+                                Text("GOLD VAULT")
+                                    .font(.system(size: 32, weight: .black, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                Text("UNLOCKING SECOND SPIN…")
+                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .kerning(2)
+                                    .foregroundColor(Color.yellow.opacity(0.85))
+                            } else {
+                                Text(app.rarity == "gold" ? "★ SPECIAL RARE ITEM ★" : app.rarity.uppercased())
+                                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                                    .kerning(3)
+                                    .foregroundColor(Color(app.color))
+                                Text(app.name)
+                                    .font(.system(size: 34, weight: .black, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                                Text("OPENING…")
+                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .kerning(2)
+                                    .foregroundColor(.white.opacity(0.45))
+                            }
                         }
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                     } else if !isSpinning {
@@ -478,7 +506,27 @@ public struct ContentView: View {
     /// The app's real icon when iOS provides it, otherwise the symbol tile.
     @ViewBuilder
     private func appIcon(_ app: AppEntry, size: CGFloat, symbolSize: CGFloat, radius: CGFloat, stroke: CGFloat) -> some View {
-        if let icon = app.icon {
+        if app.rarity == "gold" && !app.isRevealedGold {
+            ZStack {
+                LinearGradient(
+                    colors: [Color(red: 1.0, green: 0.95, blue: 0.58), Color(red: 1.0, green: 0.78, blue: 0.08)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+
+                Text("?")
+                    .font(.system(size: symbolSize * 1.35, weight: .black, design: .rounded))
+                    .foregroundColor(.white)
+                    .shadow(color: Color(red: 0.55, green: 0.3, blue: 0.0).opacity(0.8), radius: 4, x: 0, y: 2)
+            }
+            .frame(width: size, height: size)
+            .overlay(
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(Color.white.opacity(0.8), lineWidth: stroke)
+                    .shadow(color: Color.yellow.opacity(0.7), radius: 8)
+            )
+        } else if let icon = app.icon {
             Image(uiImage: icon)
                 .resizable()
                 .interpolation(.high)
@@ -522,7 +570,7 @@ public struct ContentView: View {
             Color.black.opacity(0.85).edgesIgnoringSafeArea(.all)
 
             VStack(spacing: 16) {
-                Text("★ UNBOXED ★")
+                Text(app.rarity == "gold" ? "★ SPECIAL RARE ITEM ★" : "★ UNBOXED ★")
                     .font(.system(size: 14, weight: .black, design: .monospaced))
                     .foregroundColor(.yellow)
 
@@ -571,18 +619,41 @@ public struct ContentView: View {
         guard appsModel.scanDone else { pendingUnbox = true; return }
         pendingUnbox = false
         showWinnerBanner = false
+        isGoldSequence = false
+        isGoldSecondSpin = false
+        finalGoldWinner = nil
         statusText = "CASE INBOUND // STAND BY..."
-        // Fresh reel, rewound to the start, hidden behind the crate.
         landed = false
         InstalledAppsModel.heavyScanPaused = true
-        // Build the whole reel now, winner included, while the crate hides it,
-        // so nothing has to be rebuilt at the moment the spin starts.
+
         var items: [AppEntry] = []
         for _ in 0..<totalReelCards {
             if let app = appsModel.randomWeighted() { items.append(app) }
         }
         guard items.count > winnerTargetIndex else { return }
-        winningApp = items[winnerTargetIndex]
+
+        // Check if user hit gold naturally (2%) or primed it for testing:
+        let isGoldHit = forceGoldNext || (items[winnerTargetIndex].rarity == "gold")
+        forceGoldNext = false
+
+        if isGoldHit {
+            isGoldSequence = true
+            // Select the actual winning gold app for the 2nd spin:
+            let allGoldCandidates = appsModel.apps.filter { $0.rarity == "gold" }
+            let goldPool = allGoldCandidates.isEmpty ? appsModel.apps : allGoldCandidates
+            let chosenWinner = (goldPool.randomElement() ?? items[winnerTargetIndex]).asRevealed()
+            finalGoldWinner = chosenWinner
+
+            // Replace the winner on the 1st reel with the iconic Mystery Gold '?' card:
+            let mysteryCard = AppEntry(id: "com.appunboxed.mystery.gold", name: "★ SPECIAL ITEM ★", scheme: "",
+                                       rarity: "gold", systemIcon: "questionmark", icon: nil,
+                                       category: appsModel.selectedCategory, isRevealedGold: false)
+            items[winnerTargetIndex] = mysteryCard
+            winningApp = mysteryCard
+        } else {
+            winningApp = items[winnerTargetIndex]
+        }
+
         reelItems = items
         reel.load(items: items, position: reelStartIndex)
         showCrate = true
@@ -604,7 +675,7 @@ public struct ContentView: View {
         let feedback = UIImpactFeedbackGenerator(style: .light)
         feedback.prepare()
         var lastHaptic = -1.0
-        for time in tickTimes(from: start, to: target) {
+        for time in tickTimes(from: start, to: target, duration: rollDuration) {
             let withHaptic = time - lastHaptic >= 0.07
             if withHaptic { lastHaptic = time }
             DispatchQueue.main.asyncAfter(deadline: .now() + time) {
@@ -616,15 +687,80 @@ public struct ContentView: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + rollDuration + 0.2) {
             reel.land(on: winnerTargetIndex, accent: winner.color)
-            InstalledAppsModel.heavyScanPaused = false
-            isSpinning = false
             landed = true
-            statusText = "LANDED: \(winner.name.uppercased())!"
             CSGOAudioPlayer.shared.playWin()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
-                appsModel.launch(app: winner)
+            if isGoldSequence, finalGoldWinner != nil {
+                // Gold Mystery Item hit! Announce and prepare for the 2nd spin!
+                statusText = "★ SPECIAL RARE ITEM HIT! ★"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                    startGoldSecondSpin()
+                }
+            } else {
+                InstalledAppsModel.heavyScanPaused = false
+                isSpinning = false
+                statusText = "LANDED: \(winner.name.uppercased())!"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
+                    appsModel.launch(app: winner)
+                }
+            }
+        }
+    }
+
+    /// Second spin animation: triggered when the first reel hits the 2% Gold mystery item!
+    /// The entire reel transforms into all-gold items, spins, and reveals the final gold app!
+    private func startGoldSecondSpin() {
+        guard let finalWinner = finalGoldWinner else { return }
+        isGoldSecondSpin = true
+        isSpinning = true
+        landed = false
+        statusText = "★ GOLD VAULT UNLOCKED // SPINNING FOR GOLD... ★"
+
+        // Build All-Gold Reel
+        let allGold = appsModel.apps.filter { $0.rarity == "gold" }.map { $0.asRevealed() }
+        let basePool = allGold.isEmpty ? appsModel.apps.map { $0.asRevealed() } : allGold
+
+        var goldReelItems: [AppEntry] = []
+        for _ in 0..<totalReelCards {
+            goldReelItems.append(basePool.randomElement() ?? finalWinner)
+        }
+        goldReelItems[winnerTargetIndex] = finalWinner
+        reelItems = goldReelItems
+
+        // Load into reel strip and start second roll
+        reel.load(items: goldReelItems, position: reelStartIndex)
+
+        let goldRollDuration: Double = 5.0
+        let start = Double(reelStartIndex)
+        let target = Double(winnerTargetIndex) + Double.random(in: -0.25...0.25)
+        reel.roll(to: CGFloat(target), duration: goldRollDuration, curve: rollCurve)
+
+        let feedback = UIImpactFeedbackGenerator(style: .medium)
+        feedback.prepare()
+        var lastHaptic = -1.0
+        for time in tickTimes(from: start, to: target, duration: goldRollDuration) {
+            let withHaptic = time - lastHaptic >= 0.065
+            if withHaptic { lastHaptic = time }
+            DispatchQueue.main.asyncAfter(deadline: .now() + time) {
+                CSGOAudioPlayer.shared.playTick()
+                reel.tick()
+                if withHaptic { feedback.impactOccurred() }
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + goldRollDuration + 0.2) {
+            reel.land(on: winnerTargetIndex, accent: finalWinner.color)
+            InstalledAppsModel.heavyScanPaused = false
+            isSpinning = false
+            landed = true
+            winningApp = finalWinner
+            statusText = "★ UNBOXED: \(finalWinner.name.uppercased())! ★"
+            CSGOAudioPlayer.shared.playWin()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                appsModel.launch(app: finalWinner)
             }
         }
     }
@@ -632,7 +768,7 @@ public struct ContentView: View {
     /// When each card edge crosses the marker, found by walking the same
     /// bezier curve the animation uses, so there is one tick per card. Only
     /// crossings under 22 ms apart (the first few cards at launch) are merged.
-    private func tickTimes(from: Double, to: Double) -> [Double] {
+    private func tickTimes(from: Double, to: Double, duration: Double = 6.4) -> [Double] {
         func bezier(_ u: Double, _ a: Double, _ b: Double) -> Double {
             let m = 1 - u
             return 3 * m * m * u * a + 3 * m * u * u * b + u * u * u
@@ -645,7 +781,7 @@ public struct ContentView: View {
         while edge < to {
             let fraction = (edge - from) / (to - from)
             while u < 1, bezier(u, rollCurve.1, rollCurve.3) < fraction { u += 0.0005 }
-            let time = bezier(u, rollCurve.0, rollCurve.2) * rollDuration
+            let time = bezier(u, rollCurve.0, rollCurve.2) * duration
             if time - last >= 0.022 {
                 times.append(time)
                 last = time

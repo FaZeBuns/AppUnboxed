@@ -9,8 +9,9 @@ public struct AppEntry: Identifiable, Hashable {
     public let systemIcon: String  // SF Symbol fallback
     public let icon: UIImage?      // the app's real icon when iOS hands it over
     public let category: AppCategory
+    public let isRevealedGold: Bool
 
-    public init(id: String, name: String, scheme: String, rarity: String, systemIcon: String, icon: UIImage?, category: AppCategory = .tools) {
+    public init(id: String, name: String, scheme: String, rarity: String, systemIcon: String, icon: UIImage?, category: AppCategory = .tools, isRevealedGold: Bool = false) {
         self.id = id
         self.name = name
         self.scheme = scheme
@@ -18,6 +19,12 @@ public struct AppEntry: Identifiable, Hashable {
         self.systemIcon = systemIcon
         self.icon = icon
         self.category = category
+        self.isRevealedGold = isRevealedGold
+    }
+
+    public func asRevealed() -> AppEntry {
+        AppEntry(id: id, name: name, scheme: scheme, rarity: rarity,
+                 systemIcon: systemIcon, icon: icon, category: category, isRevealedGold: true)
     }
 
     public var color: UIColor {

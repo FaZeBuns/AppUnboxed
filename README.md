@@ -19,11 +19,16 @@ iPhone (iOS 16 or newer).
 ## What it does
 
 - **Cover screen**: an idle 3D loot box that spins, floats, rattles and leaks
-  gold light while your apps are scanned.
+  gold light while your apps are dynamically scanned.
+- **Category Filter**: 6 quick toggles on the cover screen (`ALL`, `GAMES`,
+  `SOCIAL`, `MEDIA`, `FOOD`, `TOOLS`) to roll from all apps or specific cases.
 - **Unfold to open**: tells an unfold apart from a rotation.
 - **Crate cinematic**: a real six-sided crate with synced sound and haptics.
 - **Fullscreen reel**: one tick per card, weighted drop odds (2% gold up to
   46% mil-spec), lands on an app and opens it.
+- **Gold Mystery Item & 2nd Spin**: landing on the 2% Gold Special Item reveals
+  a golden `?` mystery card and automatically triggers an epic second spin with
+  an all-gold reel to reveal the winning gold app!
 - **Add Apps**: search the App Store and add anything the scan missed.
 
 ## Which apps it can find
@@ -99,6 +104,8 @@ for its full dual-screen canvas, and sign after stamping.
 
 ### Tools for contributors
 
+- `scripts/generate_app_icon.py` generates the monochromatic 3D isometric box
+  app icons with Pillow and supersampling.
 - `scripts/test_on_iphone.sh` installs a build on the jailbroken phone and
   saves snapshots and the scan log.
 - `DetectionLab` runs once per version and writes

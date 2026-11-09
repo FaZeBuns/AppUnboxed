@@ -229,26 +229,39 @@ enum ReelCard {
     /// icon and its name. Rasterised once, then moved as a single texture.
     static func layer(for app: AppEntry, size: CGSize) -> CALayer {
         let scale = UIScreen.main.scale
-        let tint = app.color
+        let isMysteryGold = app.rarity == "gold" && !app.isRevealedGold
+        let tint = isMysteryGold ? UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0) : app.color
         let card = CALayer()
         card.bounds = CGRect(origin: .zero, size: size)
         card.cornerRadius = size.width * 0.085
         card.cornerCurve = .continuous
         card.masksToBounds = true
         card.backgroundColor = UIColor(red: 0.075, green: 0.082, blue: 0.115, alpha: 1).cgColor
-        card.borderColor = UIColor(white: 1, alpha: 0.07).cgColor
-        card.borderWidth = 1
+        card.borderColor = isMysteryGold ? UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 0.35).cgColor : UIColor(white: 1, alpha: 0.07).cgColor
+        card.borderWidth = isMysteryGold ? 1.5 : 1
 
         let glow = CAGradientLayer()
         glow.frame = card.bounds
-        glow.colors = [tint.withAlphaComponent(0).cgColor, tint.withAlphaComponent(0.36).cgColor]
+        if isMysteryGold {
+            glow.colors = [
+                UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 0.08).cgColor,
+                UIColor(red: 1.0, green: 0.70, blue: 0.0, alpha: 0.42).cgColor
+            ]
+        } else {
+            glow.colors = [tint.withAlphaComponent(0).cgColor, tint.withAlphaComponent(0.36).cgColor]
+        }
         glow.startPoint = CGPoint(x: 0.5, y: 0.5)
         glow.endPoint = CGPoint(x: 0.5, y: 1)
         card.addSublayer(glow)
 
         let bar = CALayer()
-        bar.frame = CGRect(x: 0, y: size.height - 4, width: size.width, height: 4)
+        bar.frame = CGRect(x: 0, y: size.height - (isMysteryGold ? 5 : 4), width: size.width, height: isMysteryGold ? 5 : 4)
         bar.backgroundColor = tint.cgColor
+        if isMysteryGold {
+            bar.shadowColor = tint.cgColor
+            bar.shadowOpacity = 0.8
+            bar.shadowRadius = 6
+        }
         card.addSublayer(bar)
 
         let iconSide = size.width * 0.56
@@ -259,7 +272,11 @@ enum ReelCard {
 
         let icon = CALayer()
         icon.frame = CGRect(x: (size.width - iconSide) / 2, y: top, width: iconSide, height: iconSide)
-        icon.contents = iconImage(for: app, side: iconSide, scale: scale)
+        if isMysteryGold {
+            icon.contents = mysteryGoldIconImage(side: iconSide, scale: scale)
+        } else {
+            icon.contents = iconImage(for: app, side: iconSide, scale: scale)
+        }
         icon.contentsScale = scale
         card.addSublayer(icon)
 
@@ -269,18 +286,84 @@ enum ReelCard {
             font = UIFont(descriptor: rounded, size: fontSize)
         }
         label.font = font
-        label.fontSize = fontSize
-        label.string = app.name
-        label.foregroundColor = UIColor.white.cgColor
+        label.fontSize = isMysteryGold ? fontSize * 0.85 : fontSize
+        label.string = isMysteryGold ? "★ SPECIAL ITEM ★" : app.name
+        label.foregroundColor = isMysteryGold ? UIColor(red: 1.0, green: 0.88, blue: 0.35, alpha: 1).cgColor : UIColor.white.cgColor
         label.alignmentMode = .center
         label.truncationMode = .end
         label.contentsScale = scale
-        label.frame = CGRect(x: 10, y: top + iconSide + gap, width: size.width - 20, height: fontSize * 1.35)
+        label.frame = CGRect(x: 8, y: top + iconSide + gap, width: size.width - 16, height: fontSize * 1.35)
         card.addSublayer(label)
 
         card.shouldRasterize = true
         card.rasterizationScale = scale
         return card
+    }
+
+    /// The golden question mark tile for special rare items.
+    private static func mysteryGoldIconImage(side: CGFloat, scale: CGFloat) -> CGImage? {
+        let key = "mystery_gold@\(Int(side))"
+        if let cached = iconCache[key] { return cached }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = false
+        let rect = CGRect(x: 0, y: 0, width: side, height: side)
+        let image = UIGraphicsImageRenderer(size: rect.size, format: format).image { ctx in
+            let cg = ctx.cgContext
+            let shape = UIBezierPath(roundedRect: rect, cornerRadius: side * 0.225)
+            shape.addClip()
+
+            // 1. Rich metallic gold gradient
+            let colors = [
+                UIColor(red: 1.0, green: 0.95, blue: 0.58, alpha: 1.0).cgColor,
+                UIColor(red: 1.0, green: 0.80, blue: 0.10, alpha: 1.0).cgColor,
+                UIColor(red: 0.85, green: 0.52, blue: 0.02, alpha: 1.0).cgColor
+            ] as CFArray
+            let space = CGColorSpaceCreateDeviceRGB()
+            if let gradient = CGGradient(colorsSpace: space, colors: colors, locations: [0.0, 0.45, 1.0]) {
+                cg.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 0), end: CGPoint(x: side, y: side), options: [])
+            }
+
+            // 2. Beveled gold inner rim
+            let insetRect = rect.insetBy(dx: 2, dy: 2)
+            let borderPath = UIBezierPath(roundedRect: insetRect, cornerRadius: side * 0.20)
+            borderPath.lineWidth = 2.5
+            UIColor(red: 1.0, green: 1.0, blue: 0.85, alpha: 0.9).setStroke()
+            borderPath.stroke()
+
+            // 3. Question mark text
+            let fontSize = side * 0.64
+            var font = UIFont.systemFont(ofSize: fontSize, weight: .black)
+            if let rounded = font.fontDescriptor.withDesign(.rounded) {
+                font = UIFont(descriptor: rounded, size: fontSize)
+            }
+
+            let text = "?" as NSString
+            let style = NSMutableParagraphStyle()
+            style.alignment = .center
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: UIColor.white,
+                .paragraphStyle: style,
+                .shadow: {
+                    let s = NSShadow()
+                    s.shadowColor = UIColor(red: 0.55, green: 0.28, blue: 0.0, alpha: 0.85)
+                    s.shadowOffset = CGSize(width: 0, height: 2)
+                    s.shadowBlurRadius = 4
+                    return s
+                }()
+            ]
+
+            let textSize = text.size(withAttributes: attrs)
+            let textRect = CGRect(x: (side - textSize.width) / 2,
+                                  y: (side - textSize.height) / 2 - side * 0.02,
+                                  width: textSize.width,
+                                  height: textSize.height)
+            text.draw(in: textRect, withAttributes: attrs)
+        }.cgImage
+        if iconCache.count > 400 { iconCache.removeAll() }
+        iconCache[key] = image
+        return image
     }
 
     /// The real icon clipped to the iOS icon shape, or a symbol tile fallback.
