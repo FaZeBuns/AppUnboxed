@@ -1,0 +1,10 @@
+*.ipa
+dist/
+build/
+build.env
+__pycache__/
+.DS_Store
+test_results/
+detection_report.json
+device_dump.json
+device_prefs.json

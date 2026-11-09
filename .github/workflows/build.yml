@@ -1,0 +1,18 @@
+name: Build IPA
+
+# Manual for now: the macOS build script has not been proven on a runner yet.
+# Run it from the Actions tab; the unsigned .ipa is attached as an artifact.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: bash scripts/build_macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AppUnboxed-ipa
+          path: dist/*.ipa

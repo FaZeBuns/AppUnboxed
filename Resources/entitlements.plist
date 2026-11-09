@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Baseline entitlements for a free-cert / Sideloadly install.
+      The app-group / task_allow set here is what a sandboxed sideload gets.
+      If this binary is ever signed for TrollStore, add
+        com.apple.private.security.no-sandbox
+      and the LSApplicationWorkspace read entitlement, and the dormant
+      InstalledApps bridge lights up automatically.
+    -->
+    <key>application-identifier</key>
+    <string>com.appunboxed.duo</string>
+    <key>get-task-allow</key>
+    <true/>
+</dict>
+</plist>
